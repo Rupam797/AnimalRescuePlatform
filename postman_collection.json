@@ -1,0 +1,253 @@
+{
+  "info": {
+    "name": "Animal Rescue & Adoption Platform API",
+    "_postman_id": "7817454c-1d90-4820-9cb5-173872cf3981",
+    "description": "Postman API Collection for PawRescue Platform covering Authentication, Reports, Dispatch, Volunteer Cases, Adoptions, and Admin Management.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@pawrescue.org\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/auth/login", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Citizen Signup",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sarah Jenkins\",\n  \"email\": \"sarah.jenkins@example.com\",\n  \"phone\": \"+91-9876500001\",\n  \"password\": \"User@123\",\n  \"role\": \"ROLE_USER\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/auth/signup", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "auth", "signup"] }
+          }
+        },
+        {
+          "name": "Volunteer Signup (Pending Approval)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dev Patel\",\n  \"email\": \"dev.volunteer@example.com\",\n  \"phone\": \"+91-9876500002\",\n  \"password\": \"Volunteer@123\",\n  \"role\": \"ROLE_VOLUNTEER\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/auth/signup", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "auth", "signup"] }
+          }
+        },
+        {
+          "name": "Get Current User Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "url": { "raw": "http://localhost:8080/api/auth/me", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "auth", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rescue Reports",
+      "item": [
+        {
+          "name": "Submit Injured Animal Report (JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"animalType\": \"Dog\",\n  \"animalName\": \"Cooper\",\n  \"description\": \"Stray dog hit by a two-wheeler, bleeding paw and unable to stand.\",\n  \"severity\": \"CRITICAL\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946,\n  \"address\": \"MG Road, near Metro station, Bengaluru\",\n  \"landmark\": \"Near entrance 2\",\n  \"contactPhone\": \"+91-9876500001\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/reports", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "reports"] }
+          }
+        },
+        {
+          "name": "Get My Reported Cases",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{user_token}}" }],
+            "url": { "raw": "http://localhost:8080/api/reports/my", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "reports", "my"] }
+          }
+        },
+        {
+          "name": "Admin Get All Reports (with filters)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "http://localhost:8080/api/reports?severity=CRITICAL", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "reports"], "query": [{ "key": "severity", "value": "CRITICAL" }] }
+          }
+        },
+        {
+          "name": "Admin Assign Volunteer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"volunteerId\": 2,\n  \"notes\": \"Urgent emergency pickup near MG Road\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/reports/1/assign", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "reports", "1", "assign"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Volunteer Cases",
+      "item": [
+        {
+          "name": "Get Assigned Cases",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{volunteer_token}}" }],
+            "url": { "raw": "http://localhost:8080/api/volunteer/cases", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "volunteer", "cases"] }
+          }
+        },
+        {
+          "name": "Update Case Status (RESCUED)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{volunteer_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RESCUED\",\n  \"note\": \"Animal safely transported to clinic\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/volunteer/cases/1/status", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "volunteer", "cases", "1", "status"] }
+          }
+        },
+        {
+          "name": "Update Case Status (RECOVERED)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{volunteer_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RECOVERED\",\n  \"note\": \"Full recovery, vaccinated and healthy!\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/volunteer/cases/1/status", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "volunteer", "cases", "1", "status"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Adoptions",
+      "item": [
+        {
+          "name": "Public List Adoptable Animals",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "http://localhost:8080/api/adoptions?species=Dog", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "adoptions"], "query": [{ "key": "species", "value": "Dog" }] }
+          }
+        },
+        {
+          "name": "Public Get Single Animal",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "http://localhost:8080/api/adoptions/1", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "adoptions", "1"] }
+          }
+        },
+        {
+          "name": "Admin Publish Recovered Animal",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reportId\": 2,\n  \"name\": \"Luna\",\n  \"species\": \"Cat\",\n  \"breed\": \"Calico\",\n  \"age\": \"1 year\",\n  \"gender\": \"Female\",\n  \"healthNotes\": \"Vaccinated and spayed\",\n  \"description\": \"Sweet kitten recovered from injury.\",\n  \"photoUrl\": \"https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=800&q=80\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/adoptions", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "adoptions"] }
+          }
+        },
+        {
+          "name": "Citizen Submit Adoption Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{user_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"We would love to give Luna a quiet, caring home with our family!\",\n  \"phone\": \"+91-9876500001\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/adoptions/1/request", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "adoptions", "1", "request"] }
+          }
+        },
+        {
+          "name": "Admin Approve Adoption Application",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/adoptions/requests/1/status", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "adoptions", "requests", "1", "status"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "http://localhost:8080/api/admin/stats", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "admin", "stats"] }
+          }
+        },
+        {
+          "name": "Approve Volunteer",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "http://localhost:8080/api/admin/volunteers/4/approve", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "admin", "volunteers", "4", "approve"] }
+          }
+        },
+        {
+          "name": "Disable User Account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"disabled\": true\n}"
+            },
+            "url": { "raw": "http://localhost:8080/api/admin/users/6/disable", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["api", "admin", "users", "6", "disable"] }
+          }
+        }
+      ]
+    }
+  ]
+}

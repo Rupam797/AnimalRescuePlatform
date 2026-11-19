@@ -1,0 +1,280 @@
+.animal-reports-page {
+  color: #304637;
+}
+
+.animal-reports-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.animal-reports-eyebrow {
+  margin-bottom: 10px;
+  color: #679274;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+}
+
+.animal-reports-heading h1 {
+  margin: 0 0 8px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 27px;
+  letter-spacing: -0.8px;
+}
+
+.animal-reports-heading p,
+.animal-reports-toolbar p {
+  margin: 0;
+  color: #89968d;
+  font-size: 12px;
+}
+
+.animal-reports-total {
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #eef7ef;
+  color: #477d51;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.animal-report-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.animal-report-summary article {
+  padding: 17px;
+  border: 1px solid #e8eee7;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.animal-report-summary span {
+  display: block;
+  margin-bottom: 9px;
+  color: #87948a;
+  font-size: 11px;
+}
+
+.animal-report-summary strong {
+  color: #304637;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 25px;
+}
+
+.animal-reports-panel {
+  overflow: hidden;
+  border: 1px solid #e8eee7;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.animal-reports-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px;
+}
+
+.animal-reports-toolbar h2 {
+  margin: 0 0 7px;
+  color: #344a3a;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 14px;
+}
+
+.animal-reports-toolbar input {
+  width: min(100%, 320px);
+  padding: 10px 12px;
+  border: 1px solid #e1e9e1;
+  border-radius: 8px;
+  background: #fcfdfc;
+  color: #405346;
+  font-size: 11px;
+}
+
+.animal-reports-table-wrap {
+  overflow-x: auto;
+}
+
+.animal-reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.animal-reports-table thead {
+  background: #f8faf8;
+}
+
+.animal-reports-table th {
+  padding: 13px 15px;
+  color: #98a39b;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.animal-reports-table td {
+  padding: 14px 15px;
+  border-bottom: 1px solid #eef2ee;
+  color: #718075;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.animal-reports-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.animal-reports-table tbody tr:hover {
+  background: #fbfdfb;
+}
+
+.animal-report-identity {
+  display: flex;
+  min-width: 165px;
+  align-items: center;
+  gap: 10px;
+}
+
+.animal-report-image {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #edf5ed;
+  font-size: 22px;
+}
+
+.animal-report-image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.animal-report-identity strong,
+.animal-report-identity span {
+  display: block;
+}
+
+.animal-report-identity strong {
+  color: #405346;
+  font-size: 11px;
+}
+
+.animal-report-identity span {
+  margin-top: 5px;
+  color: #99a49b;
+  font-size: 10px;
+}
+
+.animal-report-condition {
+  min-width: 190px;
+  max-width: 270px;
+  line-height: 1.6;
+}
+
+.animal-report-status {
+  max-width: 130px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.animal-report-status.pending {
+  background: #fff4e3;
+  color: #ad7c38;
+}
+
+.animal-report-status.accepted {
+  background: #f2edfc;
+  color: #8a70b5;
+}
+
+.animal-report-status.in-progress {
+  background: #edf4ff;
+  color: #658cbd;
+}
+
+.animal-report-status.rescued,
+.animal-report-status.completed {
+  background: #e9f5eb;
+  color: #428253;
+}
+
+.animal-reports-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #8b998e;
+  font-size: 12px;
+}
+
+.animal-reports-empty > span {
+  font-size: 30px;
+}
+
+.animal-reports-empty h3 {
+  margin: 12px 0 7px;
+  color: #45594a;
+  font-size: 14px;
+}
+
+.animal-reports-empty p {
+  margin: 0;
+}
+
+.animal-reports-alert,
+.animal-reports-success {
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.animal-reports-alert {
+  background: #fff0ed;
+  color: #a34f44;
+}
+
+.animal-reports-success {
+  background: #edf8ee;
+  color: #39774a;
+}
+
+@media (max-width: 850px) {
+  .animal-report-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .animal-reports-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .animal-reports-toolbar input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .animal-reports-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
