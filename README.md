@@ -6,27 +6,32 @@
 [![Java](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://www.oracle.com/java/)
 [![Security](https://img.shields.io/badge/Spring%20Security-JWT%20Stateless-red.svg)](https://spring.io/projects/spring-security)
 
-PawRescue is a production-ready, full-stack, role-based platform designed to coordinate rapid-response animal rescues, field dispatching, clinical treatment logging, and public adoption rehoming. It connects citizens in the community, verified rescue volunteers in the field, and shelter administrators into a unified real-time workflow.
+PawRescue is a production-ready, full-stack, role-based platform designed to coordinate rapid-response animal rescues, field dispatching, clinical treatment logging, volunteer tracking, and public adoption rehoming. It connects citizens in the community, verified rescue volunteers in the field, and shelter administrators into a unified real-time workflow.
 
 ---
 
 ## Table of Contents
 1. [Core Concept & System Overview](#-core-concept--system-overview)
 2. [Role-Based Access Control (RBAC)](#-role-based-access-control-rbac)
-3. [System Architecture](#-system-architecture)
-4. [Data Flow Diagrams (DFD)](#-data-flow-diagrams-dfd)
+3. [Key Production Features](#-key-production-features)
+   - [Real-Time Rescue Dispatch & Volunteer Tracking](#real-time-rescue-dispatch--volunteer-tracking)
+   - [GPS Inspection & Google Maps Route Navigation](#gps-inspection--google-maps-route-navigation)
+   - [Clinical Recovery & Veterinary Care Logs](#clinical-recovery--veterinary-care-logs)
+   - [Month-to-Month Adoption Filtering & Analytics](#month-to-month-adoption-filtering--analytics)
+4. [System Architecture](#-system-architecture)
+5. [Data Flow Diagrams (DFD)](#-data-flow-diagrams-dfd)
    - [Level 0: Context Diagram](#level-0-context-diagram)
    - [Level 1: System Process Decomposition](#level-1-system-process-decomposition)
    - [Level 2: Rescue Incident & Adoption Lifecycle](#level-2-rescue-incident--adoption-lifecycle)
-5. [Entity Relationship Diagram (ERD) & Database Schema](#-entity-relationship-diagram-erd--database-schema)
+6. [Entity Relationship Diagram (ERD) & Database Schema](#-entity-relationship-diagram-erd--database-schema)
    - [Mermaid ERD](#mermaid-erd)
    - [Database Tables & Column Specifications](#database-tables--column-specifications)
-6. [Tech Stack & Package Versions](#-tech-stack--package-versions)
-7. [Environment Configuration & Secrets](#-environment-configuration--secrets)
-8. [Setup & Installation Guide](#-setup--installation-guide)
-9. [Pre-Seeded Demo Accounts](#-pre-seeded-demo-accounts)
-10. [REST API Documentation](#-rest-api-documentation)
-11. [End-to-End Testing Walkthrough](#-end-to-end-testing-walkthrough)
+7. [Tech Stack & Package Versions](#-tech-stack--package-versions)
+8. [Environment Configuration & Secrets](#-environment-configuration--secrets)
+9. [Setup & Installation Guide](#-setup--installation-guide)
+10. [Pre-Seeded Demo Accounts](#-pre-seeded-demo-accounts)
+11. [REST API Documentation](#-rest-api-documentation)
+12. [End-to-End Testing Walkthrough](#-end-to-end-testing-walkthrough)
 
 ---
 
@@ -35,11 +40,13 @@ PawRescue is a production-ready, full-stack, role-based platform designed to coo
 When a street or wild animal is injured, every minute counts. PawRescue streamlines the rescue pipeline:
 
 1. **Spot & Auto-Locate:** A citizen spots an animal in distress, clicks a photo via camera upload, and the HTML5 Geolocation API auto-captures exact GPS coordinates with OpenStreetMap reverse-geocoding into a street address.
-2. **Real-Time Dispatch:** The incident alert immediately propagates to both the Admin Command Center and all verified Volunteers via the **Incoming Distress Alerts** dispatch feed.
-3. **Acceptance & Field Rescue:** An approved volunteer claims the emergency or an administrator dispatches them. The volunteer navigates to the scene via Google Maps navigation and secures the animal (`RESCUED`).
-4. **Clinical Care & Milestones:** The animal is admitted to veterinary care (`UNDER_TREATMENT`). Volunteers log medical notes, progression logs, and upload treatment photos.
-5. **Recovery & Adoption Publication:** Once marked `RECOVERED`, administrators can publish the pet to the public adoption gallery with 1-click pre-filled medical records.
-6. **Application & Rehoming:** Citizens submit adoption applications with home suitability details. Shelter administrators review applications; upon approval, the pet is marked `ADOPTED` and other pending applications are automatically resolved.
+2. **Real-Time Dispatch:** The incident alert immediately propagates to both the Admin Command Center and verified Volunteers via the **Incoming Distress Alerts** dispatch feed.
+3. **Acceptance & Field Rescue:** An approved volunteer claims the emergency or an administrator dispatches them. The system tracks **which volunteer went for rescue**, **who assigned them**, and **exact dispatch timestamps**.
+4. **GPS Inspection & Routing:** Administrators and field volunteers inspect GPS distress coordinates on interactive Leaflet maps and open 1-click turn-by-turn directions via Google Maps.
+5. **Clinical Care & Milestones:** The animal is admitted to veterinary care (`UNDER_TREATMENT`). Caretakers log medical triage notes, surgical interventions, and recovery milestones.
+6. **Recovery & Adoption Publication:** Once marked `RECOVERED`, administrators publish the pet to the public adoption gallery with 1-click pre-filled medical records.
+7. **Adoption Applications & Approval:** Citizens submit adoption applications with home suitability details. Shelter administrators review applications; upon approval, the pet is marked `ADOPTED` with an exact `adoptedAt` timestamp, and other pending applications are automatically resolved.
+8. **Date-Range Adoption Analytics:** Administrators filter adoption figures from month to month (or custom date spans), inspect species breakdowns, and analyze time-to-adoption metrics.
 
 ### Incident Lifecycle State Machine
 ```
@@ -59,7 +66,37 @@ The platform enforces strict role-based authorization at both backend API filter
 | **PUBLIC (Visitor)** | Browse landing page, live platform statistics, browse adoptable pets gallery, view detailed pet health records without logging in. |
 | **ROLE_USER (Citizen / Adopter)** | Submit new emergency distress reports with camera capture & GPS pin, track live timeline of own reported rescues, submit adoption applications, and track application status. |
 | **ROLE_VOLUNTEER** | View unassigned incoming distress calls, accept/claim rescue missions, access assigned cases workspace, navigate to incident locations via Google Maps, transition status (`RESCUED`, `UNDER_TREATMENT`, `RECOVERED`), add medical notes, and upload recovery photos. (New signups require admin approval before dispatch access). |
-| **ROLE_ADMIN** | Complete control: Real-time dashboard KPI analytics, emergency report management, manual volunteer assignment, volunteer approval/disabling, user account management, publishing recovered animals to adoption gallery, approving/rejecting adoption applications, and system notification management. |
+| **ROLE_ADMIN** | Complete control: Real-time dashboard KPI analytics, emergency report management, volunteer dispatching & tracking (who went for rescue & who assigned them), volunteer approval/disabling, user account management, month-to-month adoption date-range filtering, publishing recovered animals, and approving/rejecting adoption applications. |
+
+---
+
+## ⚡ Key Production Features
+
+### Real-Time Rescue Dispatch & Volunteer Tracking
+* **Audit Which Volunteer Went for Rescue:** In both the **Animal Reports & Dispatch** and **Rescue Cases** sections, each case displays:
+  * Assigned volunteer name with an ambulance indicator.
+  * Direct contact links (`tel:` and email) for on-site communication.
+  * **Who Assigned Them:** Name of the shelter administrator or system authority who issued the dispatch (or self-claimed by volunteer).
+  * **Dispatch Timestamp:** Formatted date, time, and relative elapsed time (e.g. `2h ago`).
+* **Volunteer-Specific Filtering:** Admins can filter all cases/reports handled by any specific volunteer, or quickly view all unassigned reports needing immediate dispatch.
+* **1-Click Volunteer Reassignment:** Admins can change or reassign volunteers with custom handling instructions (e.g. "Bring dog crate and muzzle").
+
+### GPS Inspection & Google Maps Route Navigation
+* **Pinpoint Accuracy:** Exact latitude and longitude coordinates stored with 6 decimal place precision.
+* **Embedded Interactive Map:** Powered by Leaflet and OpenStreetMap tiles.
+* **1-Click Google Maps Routing:** Direct external navigation link (`https://www.google.com/maps/dir/?api=1&destination=lat,lng`) opens turn-by-turn driving or walking directions on mobile and desktop.
+* Landmark details and reporter callback phone number accessible directly in the inspection modal.
+
+### Clinical Recovery & Veterinary Care Logs
+* **Medical Triage Logging:** Admins and volunteers record clinical notes (medication administered, surgery, wound dressing, vet clinic name).
+* **Recovery Phase Stepper:** Tracks progression through `REPORTED` $\rightarrow$ `ASSIGNED` $\rightarrow$ `RESCUED` $\rightarrow$ `UNDER_TREATMENT` $\rightarrow$ `RECOVERED` $\rightarrow$ `LISTED_FOR_ADOPTION` $\rightarrow$ `ADOPTED`.
+* **Complete Audit Timeline:** Modal stepper displaying every milestone, the timestamp, and who made the change.
+
+### Month-to-Month Adoption Filtering & Analytics
+* **Date-Range Filter:** Filter adoptions from month to month (e.g., `2026-01` to `2026-11`) or custom date ranges.
+* **Quick Presets:** "This Month", "Last Month", "Last 3 Months", "Year to Date", and "All Time".
+* **KPI Metrics & Species Distribution:** Total adoptions count, species breakdown badges (Dogs, Cats, Puppies, etc.), and average days in shelter care.
+* **Adopter Profiles:** Detailed table displaying pet photo, species/breed, adopter name, contact phone, email, and origin rescue case ID.
 
 ---
 
@@ -125,8 +162,8 @@ flowchart TD
     Volunteer -->|"4. Claim Distress Alert / Update Treatment Status / Upload Photos"| System
     System -->|"5. Available Distress Alerts & Assigned Cases"| Volunteer
 
-    Admin -->|"6. Approve Volunteers, Assign Cases, Publish Adoptions, Approve Applications"| System
-    System -->|"7. Real-time Analytics, System Alerts, Case Timelines"| Admin
+    Admin -->|"6. Approve Volunteers, Assign Cases, Filter Adoptions, Approve Applications"| System
+    System -->|"7. Real-time Analytics, Volunteer Audit, Adoption Reports, Case Timelines"| Admin
 
     Visitor -->|"8. Browse Adoptable Animals & Platform Impact Stats"| System
     System -->|"9. Pet Profiles & Shelter Metrics"| Visitor
@@ -141,10 +178,11 @@ flowchart TD
     subgraph Processes
         P1["1.0 Authentication & RBAC"]
         P2["2.0 Incident Ingestion & Geo-Triage"]
-        P3["3.0 Volunteer Dispatch & Assignment"]
+        P3["3.0 Volunteer Dispatch & Assignment Audit"]
         P4["4.0 Clinical Triage & Status Tracking"]
         P5["5.0 Adoption Publishing & Review"]
-        P6["6.0 Notifications & Metrics Service"]
+        P6["6.0 Adoption Analytics & Date-Range Reports"]
+        P7["7.0 Notifications & Metrics Service"]
     end
 
     subgraph DataStores [Database & Storage]
@@ -162,16 +200,16 @@ flowchart TD
     User -->|"Animal Photo & GPS Coordinates"| P2
     P2 -->|"Save Incident"| DS2
     P2 -->|"Upload Photo"| DS6
-    P2 -->|"Trigger Emergency Alert"| P6
+    P2 -->|"Trigger Emergency Alert"| P7
 
     Admin["Admin"] -->|"Dispatch Volunteer"| P3
     Volunteer["Volunteer"] -->|"Claim Available Case"| P3
-    P3 -->|"Create Assignment"| DS3
+    P3 -->|"Create Assignment (Volunteer + Dispatcher)"| DS3
     P3 -->|"Set Status = ASSIGNED"| DS2
 
     Volunteer -->|"Update Status (RESCUED/UNDER_TREATMENT/RECOVERED)"| P4
     Volunteer -->|"Upload Clinical Photo"| DS6
-    P4 -->|"Append Timeline History"| DS3
+    P4 -->|"Append Timeline History & Notes"| DS3
     P4 -->|"Update Report Status"| DS2
 
     Admin -->|"Publish Recovered Pet"| P5
@@ -179,9 +217,13 @@ flowchart TD
     P5 -->|"Create Animal Listing"| DS4
     User -->|"Submit Adoption Application"| P5
     P5 -->|"Store Application"| DS4
+    Admin -->|"Approve Adoption (Sets adopted_at)"| P5
 
-    P6 -->|"Insert Notifications"| DS5
-    P6 -->|"Calculate Statistics"| DS2
+    Admin -->|"Filter Adoptions (fromMonth, toMonth, species)"| P6
+    P6 <-->|"Query Period & Compute Stats"| DS4
+
+    P7 -->|"Insert Notifications"| DS5
+    P7 -->|"Calculate Statistics"| DS2
 ```
 
 ---
@@ -210,7 +252,7 @@ sequenceDiagram
     S->>DB: SELECT * FROM rescue_reports WHERE status = 'REPORTED'
     S-->>V: List of Incoming Emergency Reports
     V->>S: POST /api/volunteer/cases/{id}/claim
-    S->>DB: INSERT into rescue_assignments
+    S->>DB: INSERT into rescue_assignments (volunteer_id, assigned_by_id)
     S->>DB: UPDATE rescue_reports SET status = 'ASSIGNED'
     S-->>V: 200 OK (Case added to active missions)
 
@@ -231,9 +273,14 @@ sequenceDiagram
     S->>DB: INSERT into adoption_requests (status = 'PENDING')
     A->>S: PUT /api/adoptions/requests/{reqId}/status (status = 'APPROVED')
     S->>DB: UPDATE adoption_requests SET status = 'APPROVED'
-    S->>DB: UPDATE adoption_animals SET status = 'ADOPTED'
+    S->>DB: UPDATE adoption_animals SET status = 'ADOPTED', adopted_at = NOW()
     S->>DB: Auto-reject remaining pending requests for this animal
     S-->>A: 200 OK (Adoption Finalized)
+
+    Note over A,DB: Phase 5: Month-to-Month Adoption Reporting
+    A->>S: GET /api/adoptions/adopted-report?fromMonth=2026-01&toMonth=2026-11
+    S->>DB: Query adoption_animals WHERE status = 'ADOPTED' AND adopted_at IN range
+    S-->>A: 200 OK (totalAdopted, speciesBreakdown, animals with adopter details)
 ```
 
 ---
@@ -325,6 +372,7 @@ erDiagram
         varchar(500) photo_url
         varchar(30) status
         datetime published_at
+        datetime adopted_at "NEW"
     }
 
     ADOPTION_REQUESTS {
@@ -398,7 +446,7 @@ Stores photographic evidence from citizens and clinical updates from volunteers.
 | `created_at` | `DATETIME` | `NOT NULL` | Upload timestamp |
 
 #### 4. `rescue_assignments` Table
-Maps field volunteers to rescue reports.
+Maps field volunteers to rescue reports and tracks who authorized the dispatch.
 
 | Column Name | Data Type | Constraints / Nullable | Description |
 |---|---|---|---|
@@ -439,6 +487,7 @@ Public listings of recovered rescue animals ready for adoption.
 | `photo_url` | `VARCHAR(500)` | `NULL` | Featured showcase photo |
 | `status` | `VARCHAR(30)` | `NOT NULL`, Default: `AVAILABLE` | `AVAILABLE`, `PENDING`, `ADOPTED` |
 | `published_at` | `DATETIME` | `NOT NULL` | Publication date |
+| `adopted_at` | `DATETIME` | `NULL` | **Timestamp when adoption request was approved** |
 
 #### 7. `adoption_requests` Table
 Adoption applications submitted by prospective adopters.
@@ -542,7 +591,7 @@ npm install
 # Start Vite Development Server
 npm run dev
 ```
-Access the application at `http://localhost:5173`.
+Access the application at `http://localhost:5173` (or `http://localhost:5174`).
 
 ---
 
@@ -578,10 +627,10 @@ The database seeder automatically initializes verified accounts for testing:
 | `POST` | `/api/reports` | `ROLE_USER`, `ADMIN` | Submit emergency distress report (Multipart / JSON) |
 | `GET` | `/api/reports/my` | `ROLE_USER` | Fetch reports submitted by the logged-in citizen |
 | `GET` | `/api/reports` | `ROLE_ADMIN` | Filtered & paginated view of all incidents |
-| `GET` | `/api/reports/{id}` | Owner/Volunteer/Admin | View incident details, images, and history |
-| `PUT` | `/api/reports/{id}/status`| Volunteer/Admin | Update report lifecycle status |
-| `POST` | `/api/reports/{id}/assign`| `ROLE_ADMIN` | Assign volunteer to an incident |
-| `POST` | `/api/reports/{id}/image` | Volunteer/Admin | Upload additional progress or scene photo |
+| `GET` | `/api/reports/{id}` | Owner/Volunteer/Admin | View incident details, images, assignments, and audit history |
+| `PUT` | `/api/reports/{id}/status`| Volunteer/Admin | Update report lifecycle status with clinical note |
+| `POST` | `/api/reports/{id}/assign`| `ROLE_ADMIN` | Dispatch/reassign volunteer with handling notes |
+| `POST` | `/api/reports/{id}/image` | Volunteer/Admin | Upload additional progress or clinical photo |
 | `GET` | `/api/reports/statistics` | Public | Aggregate rescue & impact metrics |
 
 ### Volunteer Dispatch (`/api/volunteer`)
@@ -590,7 +639,7 @@ The database seeder automatically initializes verified accounts for testing:
 | `GET` | `/api/volunteer/available-reports` | `ROLE_VOLUNTEER`, `ADMIN` | Live feed of unassigned emergency reports |
 | `POST` | `/api/volunteer/cases/{id}/claim` | `ROLE_VOLUNTEER`, `ADMIN` | Claim distress alert & self-assign rescue |
 | `GET` | `/api/volunteer/cases` | `ROLE_VOLUNTEER`, `ADMIN` | List of cases assigned to logged-in volunteer |
-| `PUT` | `/api/volunteer/cases/{id}/status`| Assigned Volunteer | Advance clinical state (`RESCUED`, etc.) |
+| `PUT` | `/api/volunteer/cases/{id}/status`| Assigned Volunteer | Advance clinical state (`RESCUED`, `UNDER_TREATMENT`, `RECOVERED`) |
 | `POST` | `/api/volunteer/cases/{id}/photo` | Assigned Volunteer | Attach clinical progress photograph |
 
 ### Adoption Management (`/api/adoptions`)
@@ -604,7 +653,8 @@ The database seeder automatically initializes verified accounts for testing:
 | `POST` | `/api/adoptions/{id}/request`| `ROLE_USER` | Submit adoption application |
 | `GET` | `/api/adoptions/my-requests`| `ROLE_USER` | View personal adoption requests |
 | `GET` | `/api/adoptions/requests` | `ROLE_ADMIN` | Review all incoming adoption applications |
-| `PUT` | `/api/adoptions/requests/{id}/status`| `ROLE_ADMIN`| Approve or reject adoption application |
+| `PUT` | `/api/adoptions/requests/{id}/status`| `ROLE_ADMIN`| Approve or reject adoption application (sets `adopted_at`) |
+| `GET` | `/api/adoptions/adopted-report` | `ROLE_ADMIN` | **Filter adoptions by month/date range (`fromMonth`, `toMonth`, `species`), returning total counts, species breakdown, and adopter profiles** |
 
 ### Administration & Metrics (`/api/admin`)
 | Method | Endpoint | Access | Description |
@@ -623,8 +673,8 @@ The database seeder automatically initializes verified accounts for testing:
 Follow this step-by-step verification checklist to test the full lifecycle:
 
 ```
-[1. Report Animal] ──> [2. Claim / Dispatch] ──> [3. Medical Care] ──> [4. Publish Adoption] ──> [5. Adopt Pet]
-     (Citizen)              (Volunteer / Admin)          (Volunteer)              (Admin)                  (Adopter)
+[1. Report Animal] ──> [2. Dispatch Volunteer] ──> [3. Field Rescue & Care] ──> [4. Publish & Adopt] ──> [5. Adoption Analytics]
+     (Citizen)                 (Admin)                     (Volunteer)                   (Adopter/Admin)               (Admin)
 ```
 
 1. **Citizen Reports Animal:**
@@ -633,26 +683,32 @@ Follow this step-by-step verification checklist to test the full lifecycle:
    - Notice device GPS auto-detection and reverse-geocoded address.
    - Attach a photo, select **Severity (Critical)**, describe injuries, and click **Dispatch Animal Rescue Report**.
    - Case is saved in state `REPORTED`.
-2. **Volunteer Claims Case:**
-   - Log out and log in as field volunteer (`rahul.volunteer@pawrescue.org` / `Volunteer@123`).
-   - Navigate to **My Cases** (`/volunteer`).
-   - Under the **"Incoming Distress Alerts"** tab, see the newly reported animal.
-   - Click **Accept & Start Rescue**. The report transitions to `ASSIGNED` and moves to **My Active Cases**.
-3. **Clinical Care & Treatment:**
-   - Click **Mark Animal Rescued** &rarr; state changes to `RESCUED`.
+2. **Volunteer Claims or Admin Dispatches:**
+   - **Option A (Admin Dispatch):** Log in as admin (`admin@pawrescue.org` / `Admin@123`). In **Rescue Cases** or **Animal Reports & Dispatch**, find the report, click **Dispatch Volunteer**, select `Rahul Sharma`, and enter notes.
+   - **Option B (Volunteer Self-Claim):** Log in as volunteer (`rahul.volunteer@pawrescue.org` / `Volunteer@123`), navigate to **Incoming Distress Alerts**, and click **Accept & Start Rescue**.
+   - The assignment record is stored with `volunteer_id`, `assigned_by_id`, and `assigned_at`.
+3. **Inspect GPS Location & Google Maps Route:**
+   - In **Rescue Cases**, click **Inspect GPS** &rarr; view the Leaflet pinpoint map.
+   - Click **Open in Google Maps Directions** &rarr; Google Maps opens with the destination coordinates.
+4. **Clinical Care & Treatment:**
+   - As volunteer, click **Mark Animal Rescued** &rarr; state changes to `RESCUED`.
    - Click **Place Under Treatment** and upload a progress photo &rarr; state changes to `UNDER_TREATMENT`.
+   - As admin or volunteer, click **Log Clinical Note** to record medical care updates.
    - Click **Mark Fully Recovered** &rarr; state changes to `RECOVERED`.
-4. **Admin Publishes Pet for Adoption:**
-   - Log in as admin (`admin@pawrescue.org` / `Admin@123`).
+5. **Admin Publishes Pet for Adoption:**
    - In Admin Center, click **+ Publish Pet for Adoption**.
    - Select the recovered case from the dropdown. The form auto-populates with the animal's name, medical history, and photo.
    - Click **Publish to Gallery**. Report status transitions to `LISTED_FOR_ADOPTION`.
-5. **Adoption Application & Approval:**
+6. **Adoption Application & Approval:**
    - Log in as citizen adopter (`vikram.citizen@gmail.com` / `User@123`).
    - Navigate to **Adopt a Pet** (`/adoptions`) and select the pet.
    - Click **♡ Apply to Adopt**, enter home environment details, and submit.
-   - Switch back to Admin Center &rarr; **Adoptions** tab.
-   - Click **Approve**. The pet status transitions to `ADOPTED`, conflicting applications are resolved, and the rescue cycle is complete!
+   - Switch back to Admin Center &rarr; **Adoptions** tab &rarr; **Adoption Applications**.
+   - Click **Approve**. The pet status transitions to `ADOPTED`, `adopted_at` is stamped, and conflicting applications are automatically resolved.
+7. **Month-to-Month Adoption Filter & Analytics:**
+   - In Admin Center &rarr; **Adoptions** tab &rarr; **Monthly Adoptions Filter & Stats**.
+   - Select **From Month** (e.g. `2026-01`) and **To Month** (e.g. `2026-11`), or click presets like **"Year to Date"** or **"This Month"**.
+   - Review total adoptions count, species breakdown badges, and the detailed table showing pet details, adopter names, contact info, and days in shelter care.
 
 ---
 
