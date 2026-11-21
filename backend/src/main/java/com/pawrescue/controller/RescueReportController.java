@@ -157,7 +157,7 @@ public class RescueReportController {
         return ResponseEntity.ok(reportService.addReportPhoto(id, uploadFile, user));
     }
 
-    // Assign volunteer (Admin only)
+    // Assign or reassign volunteer (Admin only)
     @PostMapping("/{id}/assign")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ReportResponse> assignVolunteer(
@@ -166,6 +166,16 @@ public class RescueReportController {
             Authentication authentication) {
         User user = getAuthenticatedUser(authentication);
         return ResponseEntity.ok(reportService.assignVolunteer(id, request, user));
+    }
+
+    // Unassign volunteer (Admin only)
+    @DeleteMapping("/{id}/assign")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ReportResponse> unassignVolunteer(
+            @PathVariable Long id,
+            Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+        return ResponseEntity.ok(reportService.unassignVolunteer(id, user));
     }
 
     // Backward-compatible endpoint for existing dashboard statistics

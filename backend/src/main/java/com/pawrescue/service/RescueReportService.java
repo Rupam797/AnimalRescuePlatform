@@ -115,7 +115,7 @@ public class RescueReportService {
         boolean isVolunteer = currentUser.getRole() == Role.ROLE_VOLUNTEER;
         boolean isOwner = report.getReporter() != null && report.getReporter().getId().equals(currentUser.getId());
         boolean isAssigned = report.getAssignments().stream()
-                .anyMatch(a -> a.getVolunteer().getId().equals(currentUser.getId()));
+                .anyMatch(a -> a.isActive() && a.getVolunteer().getId().equals(currentUser.getId()));
 
         if (!isAdmin && !isOwner && !isAssigned && !isVolunteer) {
             throw new UnauthorizedException("You are not authorized to view this report.");
@@ -137,7 +137,7 @@ public class RescueReportService {
 
         boolean isAdmin = currentUser.getRole() == Role.ROLE_ADMIN;
         boolean isAssignedVolunteer = report.getAssignments().stream()
-                .anyMatch(a -> a.getVolunteer().getId().equals(currentUser.getId()));
+                .anyMatch(a -> a.isActive() && a.getVolunteer().getId().equals(currentUser.getId()));
 
         if (!isAdmin && !isAssignedVolunteer) {
             throw new UnauthorizedException("Only the administrator or the assigned volunteer can update report status.");
@@ -190,27 +190,57 @@ public class RescueReportService {
             throw new BadRequestException("Volunteer is not active or approved.");
         }
 
-        // Create assignment
+        // Deactivate previous active assignment(s) and capture previous volunteer
+        User previousVolunteer = null;
+        for (RescueAssignment prev : report.getAssignments()) {
+            if (prev.isActive()) {
+                if (prev.getVolunteer() != null) {
+                    previousVolunteer = prev.getVolunteer();
+                }
+                prev.setActive(false);
+                assignmentRepository.save(prev);
+            }
+        }
+
+        // Create new active assignment
         RescueAssignment assignment = new RescueAssignment(
                 report,
                 volunteer,
                 admin,
                 request.getNotes() != null ? request.getNotes().trim() : null
         );
+        assignment.setActive(true);
         report.getAssignments().add(assignment);
         assignmentRepository.save(assignment);
 
-        // If currently REPORTED, transition to ASSIGNED
+        // Transition status if necessary
         ReportStatus oldStatus = report.getStatus();
-        if (oldStatus == ReportStatus.REPORTED) {
+        boolean isReassignment = (previousVolunteer != null && !previousVolunteer.getId().equals(volunteer.getId()));
+
+        if (oldStatus == ReportStatus.REPORTED || oldStatus == ReportStatus.NOT_FOUND) {
             report.setStatus(ReportStatus.ASSIGNED);
+
+            String logMsg = isReassignment
+                    ? "Reassigned to volunteer: " + volunteer.getName() + " (previously assigned to " + previousVolunteer.getName() + "). Status reset to ASSIGNED."
+                    : "Assigned to volunteer: " + volunteer.getName();
 
             StatusHistory history = new StatusHistory(
                     report,
                     oldStatus,
                     ReportStatus.ASSIGNED,
                     admin,
-                    "Assigned to volunteer: " + volunteer.getName()
+                    logMsg
+            );
+            report.getStatusHistories().add(history);
+            statusHistoryRepository.save(history);
+        } else if (isReassignment) {
+            String logMsg = "Volunteer reassigned from " + previousVolunteer.getName() + " to " + volunteer.getName() + " by admin.";
+            StatusHistory history = new StatusHistory(
+                    report,
+                    oldStatus,
+                    oldStatus,
+                    admin,
+                    logMsg
             );
             report.getStatusHistories().add(history);
             statusHistoryRepository.save(history);
@@ -219,14 +249,54 @@ public class RescueReportService {
         RescueReport saved = reportRepository.save(report);
 
         // Send notification
-        AppNotification notification = new AppNotification(
-                "Volunteer Assigned",
-                volunteer.getName() + " was assigned to case #" + saved.getId() + " (" + saved.getAnimalName() + ")",
-                "ASSIGNMENT",
-                saved.getId()
-        );
-        notificationRepository.save(notification);
+        String noteMsg = isReassignment
+                ? volunteer.getName() + " was reassigned to case #" + saved.getId() + " (" + saved.getAnimalName() + ") replacing " + previousVolunteer.getName()
+                : volunteer.getName() + " was assigned to case #" + saved.getId() + " (" + saved.getAnimalName() + ")";
+        notificationRepository.save(new AppNotification("Volunteer Assigned", noteMsg, "ASSIGNMENT", saved.getId()));
 
+        if (isReassignment && previousVolunteer != null) {
+            notificationRepository.save(new AppNotification(
+                    "Case Reassigned",
+                    "Case #" + saved.getId() + " (" + saved.getAnimalName() + ") was reassigned to " + volunteer.getName(),
+                    "ASSIGNMENT",
+                    saved.getId()
+            ));
+        }
+
+        return ReportResponse.fromEntity(saved);
+    }
+
+    @Transactional
+    public ReportResponse unassignVolunteer(Long reportId, User admin) {
+        RescueReport report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Rescue report not found with id: " + reportId));
+
+        User previousVolunteer = null;
+        for (RescueAssignment a : report.getAssignments()) {
+            if (a.isActive()) {
+                if (a.getVolunteer() != null) {
+                    previousVolunteer = a.getVolunteer();
+                }
+                a.setActive(false);
+                assignmentRepository.save(a);
+            }
+        }
+
+        ReportStatus oldStatus = report.getStatus();
+        if (oldStatus == ReportStatus.ASSIGNED || oldStatus == ReportStatus.NOT_FOUND) {
+            report.setStatus(ReportStatus.REPORTED);
+            StatusHistory history = new StatusHistory(
+                    report,
+                    oldStatus,
+                    ReportStatus.REPORTED,
+                    admin,
+                    "Volunteer " + (previousVolunteer != null ? previousVolunteer.getName() : "") + " unassigned by admin. Case returned to open distress pool."
+            );
+            report.getStatusHistories().add(history);
+            statusHistoryRepository.save(history);
+        }
+
+        RescueReport saved = reportRepository.save(report);
         return ReportResponse.fromEntity(saved);
     }
 
@@ -259,18 +329,32 @@ public class RescueReportService {
             throw new BadRequestException("Volunteer account is not active or approved.");
         }
 
-        boolean alreadyAssigned = report.getAssignments().stream()
-                .anyMatch(a -> a.getVolunteer().getId().equals(volunteer.getId()));
+        // Deactivate any old active assignments if another volunteer claims
+        for (RescueAssignment prev : report.getAssignments()) {
+            if (prev.isActive() && !prev.getVolunteer().getId().equals(volunteer.getId())) {
+                prev.setActive(false);
+                assignmentRepository.save(prev);
+            }
+        }
 
-        if (!alreadyAssigned) {
+        RescueAssignment existing = report.getAssignments().stream()
+                .filter(a -> a.getVolunteer().getId().equals(volunteer.getId()))
+                .findFirst()
+                .orElse(null);
+
+        if (existing == null) {
             RescueAssignment assignment = new RescueAssignment(
                     report,
                     volunteer,
                     volunteer,
                     "Self-assigned by volunteer " + volunteer.getName()
             );
+            assignment.setActive(true);
             report.getAssignments().add(assignment);
             assignmentRepository.save(assignment);
+        } else {
+            existing.setActive(true);
+            assignmentRepository.save(existing);
         }
 
         if (report.getStatus() == ReportStatus.REPORTED) {

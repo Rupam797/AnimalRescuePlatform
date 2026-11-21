@@ -76,6 +76,7 @@ export const reportService = {
   updateStatus: (id, data) => api.put(`/reports/${id}/status`, data),
   patchStatus: (id, data) => api.patch(`/reports/${id}/status`, data),
   assignVolunteer: (id, data) => api.post(`/reports/${id}/assign`, data),
+  unassignVolunteer: (id) => api.delete(`/reports/${id}/assign`),
   uploadImage: (id, formData) =>
     api.post(`/reports/${id}/image`, formData, {
       headers: { "Content-Type": "multipart/form-data" },

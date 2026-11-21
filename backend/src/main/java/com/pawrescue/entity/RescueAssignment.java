@@ -31,6 +31,9 @@ public class RescueAssignment {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "active", nullable = false)
+    private boolean active = true;
+
     public RescueAssignment() {
     }
 
@@ -39,6 +42,7 @@ public class RescueAssignment {
         this.volunteer = volunteer;
         this.assignedBy = assignedBy;
         this.notes = notes;
+        this.active = true;
     }
 
     @PrePersist
@@ -94,5 +98,13 @@ public class RescueAssignment {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

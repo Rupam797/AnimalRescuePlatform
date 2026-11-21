@@ -18,6 +18,7 @@ import {
   Navigation,
   ExternalLink,
   RefreshCw,
+  UserX,
 } from "lucide-react";
 
 const ALL_STATUSES = [
@@ -111,7 +112,16 @@ export default function AnimalReports() {
     loadData();
   }, []);
 
-  // Dispatch / Reassign volunteer
+  // Helper to get active assigned volunteer
+  function getActiveAssignment(item) {
+    if (!item.assignments || item.assignments.length === 0) return null;
+    const active = item.assignments.find((a) => a.active);
+    if (active) return active;
+    const last = item.assignments[item.assignments.length - 1];
+    return last.active !== false ? last : null;
+  }
+
+  // Dispatch or Reassign volunteer
   async function handleDispatchSubmit(e) {
     if (e) e.preventDefault();
     if (!dispatchModalReport || !dispatchVolunteerId) return;
@@ -121,13 +131,22 @@ export default function AnimalReports() {
       setError("");
       setMessage("");
 
+      const currentActive = getActiveAssignment(dispatchModalReport);
+      const isReassignment = Boolean(currentActive && String(currentActive.volunteerId) !== String(dispatchVolunteerId));
+
       const res = await reportService.assignVolunteer(dispatchModalReport.id, {
         volunteerId: Number(dispatchVolunteerId),
-        notes: dispatchNotes.trim() || "Assigned via Animal Reports Dispatch",
+        notes: dispatchNotes.trim() || (isReassignment ? "Reassigned via Animal Reports Dispatch" : "Assigned via Animal Reports Dispatch"),
       });
 
       setReports((current) => current.map((r) => (r.id === res.data.id ? res.data : r)));
-      setMessage(`Volunteer successfully assigned to Report #${dispatchModalReport.id}!`);
+      
+      const assignedVolunteerName = volunteers.find((v) => v.id === Number(dispatchVolunteerId))?.name || "volunteer";
+      if (isReassignment) {
+        setMessage(`Report #${dispatchModalReport.id} successfully reassigned to ${assignedVolunteerName}!`);
+      } else {
+        setMessage(`Volunteer ${assignedVolunteerName} assigned to Report #${dispatchModalReport.id}!`);
+      }
 
       if (viewingTimelineReport && viewingTimelineReport.id === dispatchModalReport.id) {
         setViewingTimelineReport(res.data);
@@ -138,6 +157,31 @@ export default function AnimalReports() {
       setDispatchNotes("");
     } catch (err) {
       setError(err.response?.data?.message || "Failed to assign volunteer.");
+    } finally {
+      setDispatchSubmitting(false);
+    }
+  }
+
+  // Handle Unassigning Volunteer
+  async function handleUnassign(reportId) {
+    if (!reportId) return;
+    try {
+      setDispatchSubmitting(true);
+      setError("");
+      setMessage("");
+
+      const res = await reportService.unassignVolunteer(reportId);
+      setReports((current) => current.map((r) => (r.id === res.data.id ? res.data : r)));
+      setMessage(`Volunteer unassigned from Report #${reportId}. Case returned to unassigned pool.`);
+
+      if (viewingTimelineReport && viewingTimelineReport.id === reportId) {
+        setViewingTimelineReport(res.data);
+      }
+      setDispatchModalReport(null);
+      setDispatchVolunteerId("");
+      setDispatchNotes("");
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to unassign volunteer.");
     } finally {
       setDispatchSubmitting(false);
     }
@@ -211,6 +255,8 @@ export default function AnimalReports() {
   // Filtered reports
   const filteredReports = useMemo(() => {
     return reports.filter((report) => {
+      const activeVol = getActiveAssignment(report);
+
       // Search
       const query = search.trim().toLowerCase();
       if (query) {
@@ -224,6 +270,7 @@ export default function AnimalReports() {
           String(report.id),
           report.severity,
           report.reporterName,
+          activeVol?.volunteerName,
           ...(report.assignments || []).map((a) => a.volunteerName),
           ...(report.assignments || []).map((a) => a.assignedByName),
         ].some((value) => String(value ?? "").toLowerCase().includes(query));
@@ -233,18 +280,17 @@ export default function AnimalReports() {
 
       // Volunteer filter
       if (volunteerFilter === "UNASSIGNED") {
-        if (report.assignments && report.assignments.length > 0) return false;
+        if (activeVol) return false;
       } else if (volunteerFilter === "ASSIGNED") {
-        if (!report.assignments || report.assignments.length === 0) return false;
+        if (!activeVol) return false;
       } else if (volunteerFilter !== "ALL") {
         const volId = Number(volunteerFilter);
-        const hasVol = report.assignments?.some((a) => a.volunteerId === volId);
-        if (!hasVol) return false;
+        if (!activeVol || activeVol.volunteerId !== volId) return false;
       }
 
       // Status filter
       if (statusFilter === "NEEDS_DISPATCH") {
-        if (report.status !== "REPORTED" || (report.assignments && report.assignments.length > 0)) return false;
+        if (report.status !== "REPORTED" || activeVol) return false;
       } else if (statusFilter === "ACTIVE") {
         if (!["ASSIGNED", "RESCUED"].includes(report.status)) return false;
       } else if (statusFilter === "CLINIC") {
@@ -266,12 +312,15 @@ export default function AnimalReports() {
 
   // Statistics
   const totalReportsCount = reports.length;
-  const unassignedCount = reports.filter((r) => !r.assignments || r.assignments.length === 0).length;
+  const unassignedCount = reports.filter((r) => !getActiveAssignment(r)).length;
   const inFieldCount = reports.filter((r) => ["ASSIGNED", "RESCUED"].includes(r.status)).length;
   const inTreatmentCount = reports.filter((r) => r.status === "UNDER_TREATMENT").length;
   const recoveredCount = reports.filter((r) =>
     ["RECOVERED", "LISTED_FOR_ADOPTION", "ADOPTED"].includes(r.status)
   ).length;
+
+  const modalActiveAssignment = dispatchModalReport ? getActiveAssignment(dispatchModalReport) : null;
+  const isReassignMode = Boolean(modalActiveAssignment);
 
   return (
     <section className="animal-reports-page">
@@ -280,7 +329,7 @@ export default function AnimalReports() {
         <div>
           <div className="animal-reports-eyebrow">PAWRESCUE DISPATCH</div>
           <h1>Animal Reports & Dispatch</h1>
-          <p>Review distress reports, inspect GPS locations, assign rescue volunteers, and track clinical recovery.</p>
+          <p>Review distress reports, inspect GPS locations, assign or reassign rescue volunteers, and track clinical recovery.</p>
         </div>
         <button
           type="button"
@@ -412,7 +461,7 @@ export default function AnimalReports() {
                 <option value="ALL">All Volunteers (All Reports)</option>
                 <option value="UNASSIGNED">Only Unassigned Reports</option>
                 <option value="ASSIGNED">Only Assigned Reports</option>
-                <optgroup label="Filter by Specific Volunteer">
+                <optgroup label="Filter by Current Volunteer">
                   {volunteers.map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.name} (Volunteer)
@@ -499,8 +548,7 @@ export default function AnimalReports() {
               <tbody>
                 {filteredReports.map((report) => {
                   const imageSrc = getImageUrl(report.images);
-                  const isAssigned = report.assignments && report.assignments.length > 0;
-                  const assignedVol = isAssigned ? report.assignments[report.assignments.length - 1] : null;
+                  const assignedVol = getActiveAssignment(report);
 
                   return (
                     <tr key={report.id}>
@@ -685,22 +733,26 @@ export default function AnimalReports() {
                               type="button"
                               onClick={() => {
                                 setDispatchModalReport(report);
-                                setDispatchVolunteerId(String(assignedVol.volunteerId || ""));
-                                setDispatchNotes(assignedVol.notes || "");
+                                setDispatchVolunteerId("");
+                                setDispatchNotes("");
                               }}
                               style={{
-                                marginTop: "4px",
+                                marginTop: "5px",
                                 background: "#f0fdf4",
                                 border: "1px solid #bbf7d0",
                                 color: "#166534",
-                                padding: "2px 7px",
-                                borderRadius: "4px",
-                                fontSize: "10px",
+                                padding: "3px 8px",
+                                borderRadius: "5px",
+                                fontSize: "11px",
                                 fontWeight: "700",
                                 cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
                               }}
                             >
-                              Reassign / Change
+                              <RefreshCw size={11} />
+                              <span>Reassign / Change</span>
                             </button>
                           </div>
                         ) : (
@@ -984,14 +1036,14 @@ export default function AnimalReports() {
           ========================================================================= */}
       {dispatchModalReport && (
         <div className="modal-backdrop" onClick={() => !dispatchSubmitting && setDispatchModalReport(null)}>
-          <div className="modal-card" style={{ maxWidth: "500px", background: "#ffffff" }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card" style={{ maxWidth: "520px", background: "#ffffff" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
               <div>
                 <span style={{ fontSize: "11px", fontWeight: "800", color: "#1b7a43", letterSpacing: "0.5px" }}>
-                  DISPATCH VOLUNTEER
+                  {isReassignMode ? "REASSIGN VOLUNTEER" : "DISPATCH VOLUNTEER"}
                 </span>
                 <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#263b31", margin: "2px 0 0" }}>
-                  Assign to #{String(dispatchModalReport.id).padStart(4, "0")} ({dispatchModalReport.animalName})
+                  {isReassignMode ? "Reassign Another Volunteer" : "Dispatch Volunteer"} &middot; #{String(dispatchModalReport.id).padStart(4, "0")} ({dispatchModalReport.animalName})
                 </h3>
               </div>
               <button
@@ -1003,10 +1055,50 @@ export default function AnimalReports() {
               </button>
             </div>
 
+            {/* Currently assigned information box */}
+            {modalActiveAssignment && (
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "8px",
+                  padding: "12px 14px",
+                  marginBottom: "16px",
+                }}
+              >
+                <div style={{ fontSize: "11px", fontWeight: "700", color: "#166534" }}>CURRENTLY ASSIGNED VOLUNTEER</div>
+                <div style={{ fontSize: "14px", fontWeight: "800", color: "#166534", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Ambulance size={15} />
+                  <span>{modalActiveAssignment.volunteerName}</span>
+                </div>
+                <div style={{ fontSize: "12px", color: "#365343", marginTop: "3px" }}>
+                  Contact: <b>{modalActiveAssignment.volunteerPhone || "N/A"}</b> &middot; Dispatched: {formatDate(modalActiveAssignment.assignedAt)} ({timeAgo(modalActiveAssignment.assignedAt)})
+                </div>
+              </div>
+            )}
+
+            {/* Status Notice if NOT FOUND */}
+            {dispatchModalReport.status === "NOT_FOUND" && (
+              <div
+                style={{
+                  background: "#fef3c7",
+                  border: "1px solid #fde68a",
+                  color: "#92400e",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  marginBottom: "16px",
+                  lineHeight: "1.5",
+                }}
+              >
+                <strong>Status Update Notice:</strong> This report was marked as <b>NOT FOUND</b>. Reassigning a new volunteer will reset the case status to <b>ASSIGNED</b> so the new volunteer can resume rescue search.
+              </div>
+            )}
+
             <form onSubmit={handleDispatchSubmit}>
               <div style={{ marginBottom: "14px" }}>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#263b31", marginBottom: "6px" }}>
-                  Select Approved Volunteer <span style={{ color: "#dc2626" }}>*</span>
+                  {isReassignMode ? "Select New Volunteer to Take Over Case *" : "Select Approved Volunteer *"}
                 </label>
                 <select
                   required
@@ -1020,26 +1112,34 @@ export default function AnimalReports() {
                     fontSize: "13px",
                     color: "#263b31",
                     background: "#ffffff",
+                    fontWeight: "600",
                   }}
                 >
-                  <option value="">Choose an active volunteer...</option>
-                  {volunteers.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} &middot; {v.phone || v.email}
-                    </option>
-                  ))}
+                  <option value="">Choose another active volunteer...</option>
+                  {volunteers.map((v) => {
+                    const isCurrent = modalActiveAssignment && v.id === modalActiveAssignment.volunteerId;
+                    return (
+                      <option key={v.id} value={v.id} disabled={isCurrent}>
+                        {v.name} {isCurrent ? "— (Currently Assigned)" : `— Phone: ${v.phone || v.email}`}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
               <div style={{ marginBottom: "18px" }}>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#263b31", marginBottom: "6px" }}>
-                  Field Dispatch Instructions
+                  {isReassignMode ? "Reassignment Instructions / Reason" : "Field Dispatch Instructions"}
                 </label>
                 <textarea
                   rows={3}
                   value={dispatchNotes}
                   onChange={(e) => setDispatchNotes(e.target.value)}
-                  placeholder="e.g. Bring dog crate and muzzle. Reported animal is injured near the school corner."
+                  placeholder={
+                    isReassignMode
+                      ? "e.g. Reassigning to another volunteer with updated area directions."
+                      : "e.g. Bring dog crate and muzzle. Reported animal is near the school corner."
+                  }
                   style={{
                     width: "100%",
                     padding: "9px 12px",
@@ -1052,43 +1152,72 @@ export default function AnimalReports() {
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => setDispatchModalReport(null)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid #d4dfd7",
-                    background: "#ffffff",
-                    color: "#475e51",
-                    fontWeight: "600",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={dispatchSubmitting || !dispatchVolunteerId}
-                  style={{
-                    padding: "8px 18px",
-                    borderRadius: "8px",
-                    background: "#1b7a43",
-                    color: "#ffffff",
-                    border: "none",
-                    fontWeight: "700",
-                    fontSize: "13px",
-                    cursor: dispatchSubmitting || !dispatchVolunteerId ? "not-allowed" : "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <Ambulance size={14} />
-                  <span>{dispatchSubmitting ? "Dispatching..." : "Confirm Dispatch"}</span>
-                </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                {isReassignMode ? (
+                  <button
+                    type="button"
+                    onClick={() => handleUnassign(dispatchModalReport.id)}
+                    disabled={dispatchSubmitting}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #fecaca",
+                      background: "#fef2f2",
+                      color: "#b91c1c",
+                      fontWeight: "700",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                    title="Remove volunteer and reset case to unassigned open distress pool"
+                  >
+                    <UserX size={14} />
+                    <span>Unassign Current Volunteer</span>
+                  </button>
+                ) : (
+                  <div></div>
+                )}
+
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setDispatchModalReport(null)}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      border: "1px solid #d4dfd7",
+                      background: "#ffffff",
+                      color: "#475e51",
+                      fontWeight: "600",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={dispatchSubmitting || !dispatchVolunteerId}
+                    style={{
+                      padding: "8px 18px",
+                      borderRadius: "8px",
+                      background: "#1b7a43",
+                      color: "#ffffff",
+                      border: "none",
+                      fontWeight: "700",
+                      fontSize: "13px",
+                      cursor: dispatchSubmitting || !dispatchVolunteerId ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <Ambulance size={14} />
+                    <span>{dispatchSubmitting ? "Updating..." : isReassignMode ? "Confirm Reassignment" : "Confirm Dispatch"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1253,40 +1382,68 @@ export default function AnimalReports() {
                 marginBottom: "20px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-                <Shield size={16} color="#1b7a43" />
-                <span style={{ fontSize: "13px", fontWeight: "700", color: "#1b7a43" }}>
-                  Assignment & Dispatch Particulars
-                </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Shield size={16} color="#1b7a43" />
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: "#1b7a43" }}>
+                    Assignment & Dispatch Particulars
+                  </span>
+                </div>
+                {getActiveAssignment(viewingTimelineReport) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDispatchModalReport(viewingTimelineReport);
+                      setDispatchVolunteerId("");
+                      setDispatchNotes("");
+                    }}
+                    style={{
+                      background: "#e8f5ec",
+                      border: "1px solid #c9e4d1",
+                      color: "#166534",
+                      padding: "3px 8px",
+                      borderRadius: "5px",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <RefreshCw size={11} />
+                    <span>Reassign Volunteer</span>
+                  </button>
+                )}
               </div>
 
-              {viewingTimelineReport.assignments && viewingTimelineReport.assignments.length > 0 ? (
-                (() => {
-                  const assignment = viewingTimelineReport.assignments[viewingTimelineReport.assignments.length - 1];
+              {(() => {
+                const activeAssigned = getActiveAssignment(viewingTimelineReport);
+                if (activeAssigned) {
                   return (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px" }}>
                       <div>
-                        <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>ASSIGNED VOLUNTEER</div>
+                        <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>ACTIVE VOLUNTEER</div>
                         <div style={{ fontWeight: "700", color: "#263b31", marginTop: "2px" }}>
-                          {assignment.volunteerName}
+                          {activeAssigned.volunteerName}
                         </div>
-                        {assignment.volunteerPhone && (
+                        {activeAssigned.volunteerPhone && (
                           <div style={{ fontSize: "12px", color: "#1b7a43", display: "flex", alignItems: "center", gap: "3px" }}>
                             <Phone size={11} />
-                            <a href={`tel:${assignment.volunteerPhone}`} style={{ color: "#1b7a43", textDecoration: "none", fontWeight: "600" }}>
-                              {assignment.volunteerPhone}
+                            <a href={`tel:${activeAssigned.volunteerPhone}`} style={{ color: "#1b7a43", textDecoration: "none", fontWeight: "600" }}>
+                              {activeAssigned.volunteerPhone}
                             </a>
                           </div>
                         )}
-                        {assignment.volunteerEmail && (
-                          <div style={{ fontSize: "11px", color: "#61776b" }}>{assignment.volunteerEmail}</div>
+                        {activeAssigned.volunteerEmail && (
+                          <div style={{ fontSize: "11px", color: "#61776b" }}>{activeAssigned.volunteerEmail}</div>
                         )}
                       </div>
 
                       <div>
                         <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>ASSIGNED BY</div>
                         <div style={{ fontWeight: "700", color: "#263b31", marginTop: "2px" }}>
-                          {assignment.assignedByName || "System Administrator"}
+                          {activeAssigned.assignedByName || "System Administrator"}
                         </div>
                         <div style={{ fontSize: "11px", color: "#61776b" }}>Rescue Center Authority</div>
                       </div>
@@ -1294,52 +1451,54 @@ export default function AnimalReports() {
                       <div>
                         <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>DISPATCH TIMESTAMP</div>
                         <div style={{ fontWeight: "700", color: "#166534", marginTop: "2px" }}>
-                          {formatDate(assignment.assignedAt)}
+                          {formatDate(activeAssigned.assignedAt)}
                         </div>
                         <div style={{ fontSize: "11px", color: "#059669" }}>
-                          When volunteer went for rescue ({timeAgo(assignment.assignedAt)})
+                          When volunteer went for rescue ({timeAgo(activeAssigned.assignedAt)})
                         </div>
                       </div>
 
                       <div>
                         <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>DISPATCH INSTRUCTIONS</div>
                         <div style={{ color: "#374151", marginTop: "2px" }}>
-                          {assignment.notes || "Standard emergency rescue dispatch"}
+                          {activeAssigned.notes || "Standard emergency rescue dispatch"}
                         </div>
                       </div>
                     </div>
                   );
-                })()
-              ) : (
-                <div>
-                  <div style={{ color: "#b45309", fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>
-                    Case is currently unassigned (No volunteer dispatched yet).
+                }
+
+                return (
+                  <div>
+                    <div style={{ color: "#b45309", fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>
+                      Case is currently unassigned (No volunteer dispatched yet).
+                    </div>
+                    <button
+                      onClick={() => {
+                        setDispatchModalReport(viewingTimelineReport);
+                        setDispatchVolunteerId("");
+                        setDispatchNotes("");
+                      }}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: "6px",
+                        background: "#1b7a43",
+                        color: "#fff",
+                        border: "none",
+                        fontWeight: "700",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <UserPlus size={13} />
+                      <span>Dispatch Volunteer Now</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setDispatchModalReport(viewingTimelineReport);
-                      setDispatchVolunteerId("");
-                      setDispatchNotes("");
-                    }}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: "6px",
-                      background: "#1b7a43",
-                      color: "#fff",
-                      border: "none",
-                      fontWeight: "700",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <UserPlus size={13} />
-                    <span>Dispatch Volunteer Now</span>
-                  </button>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Visual Milestones Stepper */}

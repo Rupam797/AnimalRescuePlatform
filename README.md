@@ -345,6 +345,7 @@ erDiagram
         bigint report_id FK
         bigint volunteer_id FK
         bigint assigned_by_id FK
+        boolean active
         datetime assigned_at
         text notes
     }
@@ -446,7 +447,7 @@ Stores photographic evidence from citizens and clinical updates from volunteers.
 | `created_at` | `DATETIME` | `NOT NULL` | Upload timestamp |
 
 #### 4. `rescue_assignments` Table
-Maps field volunteers to rescue reports and tracks who authorized the dispatch.
+Maps field volunteers to rescue reports and tracks who authorized the dispatch and active status.
 
 | Column Name | Data Type | Constraints / Nullable | Description |
 |---|---|---|---|
@@ -454,6 +455,7 @@ Maps field volunteers to rescue reports and tracks who authorized the dispatch.
 | `report_id` | `BIGINT` | `NOT NULL`, `FOREIGN KEY (rescue_reports.id)` | Incident report ID |
 | `volunteer_id` | `BIGINT` | `NOT NULL`, `FOREIGN KEY (users.id)` | Dispatched volunteer user ID |
 | `assigned_by_id` | `BIGINT` | `NOT NULL`, `FOREIGN KEY (users.id)` | Admin or self-assigning volunteer ID |
+| `active` | `BOOLEAN` | `NOT NULL`, Default: `true` | Active assignment flag (deactivated on reassignment or unassign) |
 | `assigned_at` | `DATETIME` | `NOT NULL` | Time assignment occurred |
 | `notes` | `TEXT` | `NULL` | Special dispatch or handling notes |
 
@@ -629,7 +631,8 @@ The database seeder automatically initializes verified accounts for testing:
 | `GET` | `/api/reports` | `ROLE_ADMIN` | Filtered & paginated view of all incidents |
 | `GET` | `/api/reports/{id}` | Owner/Volunteer/Admin | View incident details, images, assignments, and audit history |
 | `PUT` | `/api/reports/{id}/status`| Volunteer/Admin | Update report lifecycle status with clinical note |
-| `POST` | `/api/reports/{id}/assign`| `ROLE_ADMIN` | Dispatch/reassign volunteer with handling notes |
+| `POST` | `/api/reports/{id}/assign`| `ROLE_ADMIN` | Dispatch or reassign volunteer with handling notes |
+| `DELETE` | `/api/reports/{id}/assign`| `ROLE_ADMIN` | Unassign current volunteer and revert case status to `REPORTED` |
 | `POST` | `/api/reports/{id}/image` | Volunteer/Admin | Upload additional progress or clinical photo |
 | `GET` | `/api/reports/statistics` | Public | Aggregate rescue & impact metrics |
 

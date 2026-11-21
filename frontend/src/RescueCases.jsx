@@ -25,6 +25,7 @@ import {
   Phone,
   Mail,
   ArrowRight,
+  UserX,
 } from "lucide-react";
 
 const ALL_STATUSES = [
@@ -131,7 +132,7 @@ export default function RescueCases() {
     };
   }, [refreshKey]);
 
-  // Handle Volunteer Dispatch / Reassignment
+  // Handle Volunteer Dispatch or Reassignment
   async function handleDispatchSubmit(e) {
     if (e) e.preventDefault();
     if (!dispatchModalCase || !dispatchVolunteerId) return;
@@ -141,13 +142,23 @@ export default function RescueCases() {
       setError("");
       setMessage("");
 
+      const currentActive = dispatchModalCase.assignments?.find((a) => a.active) || 
+        (dispatchModalCase.assignments && dispatchModalCase.assignments.length > 0 ? dispatchModalCase.assignments[dispatchModalCase.assignments.length - 1] : null);
+      const isReassignment = Boolean(currentActive && currentActive.active !== false && String(currentActive.volunteerId) !== String(dispatchVolunteerId));
+
       const res = await reportService.assignVolunteer(dispatchModalCase.id, {
         volunteerId: Number(dispatchVolunteerId),
-        notes: dispatchNotes.trim() || "Assigned via Rescue Operations Dispatch",
+        notes: dispatchNotes.trim() || (isReassignment ? "Reassigned via Rescue Center Operations" : "Assigned via Rescue Operations Dispatch"),
       });
 
       setCases((current) => current.map((c) => (c.id === res.data.id ? res.data : c)));
-      setMessage(`Volunteer successfully assigned to Case #${dispatchModalCase.id}!`);
+      
+      const assignedVolunteerName = volunteers.find((v) => v.id === Number(dispatchVolunteerId))?.name || "volunteer";
+      if (isReassignment) {
+        setMessage(`Case #${dispatchModalCase.id} successfully reassigned to ${assignedVolunteerName}!`);
+      } else {
+        setMessage(`Volunteer ${assignedVolunteerName} assigned to Case #${dispatchModalCase.id}!`);
+      }
       
       if (viewingTimelineCase && viewingTimelineCase.id === dispatchModalCase.id) {
         setViewingTimelineCase(res.data);
@@ -158,6 +169,31 @@ export default function RescueCases() {
       setDispatchNotes("");
     } catch (err) {
       setError(err.response?.data?.message || "Unable to assign volunteer.");
+    } finally {
+      setDispatchSubmitting(false);
+    }
+  }
+
+  // Handle Unassigning Volunteer
+  async function handleUnassign(caseId) {
+    if (!caseId) return;
+    try {
+      setDispatchSubmitting(true);
+      setError("");
+      setMessage("");
+
+      const res = await reportService.unassignVolunteer(caseId);
+      setCases((current) => current.map((c) => (c.id === res.data.id ? res.data : c)));
+      setMessage(`Volunteer unassigned from Case #${caseId}. Case returned to unassigned pool.`);
+
+      if (viewingTimelineCase && viewingTimelineCase.id === caseId) {
+        setViewingTimelineCase(res.data);
+      }
+      setDispatchModalCase(null);
+      setDispatchVolunteerId("");
+      setDispatchNotes("");
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to unassign volunteer.");
     } finally {
       setDispatchSubmitting(false);
     }
@@ -225,9 +261,21 @@ export default function RescueCases() {
     return path.startsWith("http") ? path : `${BACKEND_URL}${path}`;
   }
 
+  // Helper to get active assigned volunteer
+  function getActiveAssignment(item) {
+    if (!item.assignments || item.assignments.length === 0) return null;
+    const active = item.assignments.find((a) => a.active);
+    if (active) return active;
+    // fallback: if active flag is not set, use the latest assignment
+    const last = item.assignments[item.assignments.length - 1];
+    return last.active !== false ? last : null;
+  }
+
   // Filter logic
   const filteredCases = useMemo(() => {
     return cases.filter((item) => {
+      const activeVol = getActiveAssignment(item);
+
       // Search query
       const query = search.trim().toLowerCase();
       if (query) {
@@ -241,6 +289,7 @@ export default function RescueCases() {
           `#ar-${String(item.id).padStart(4, "0")}`,
           String(item.id),
           item.reporterName,
+          activeVol?.volunteerName,
           ...(item.assignments || []).map((a) => a.volunteerName),
           ...(item.assignments || []).map((a) => a.assignedByName),
         ].some((v) => String(v ?? "").toLowerCase().includes(query));
@@ -250,13 +299,12 @@ export default function RescueCases() {
 
       // Volunteer filter
       if (volunteerFilter === "UNASSIGNED") {
-        if (item.assignments && item.assignments.length > 0) return false;
+        if (activeVol) return false;
       } else if (volunteerFilter === "ASSIGNED") {
-        if (!item.assignments || item.assignments.length === 0) return false;
+        if (!activeVol) return false;
       } else if (volunteerFilter !== "ALL") {
         const volId = Number(volunteerFilter);
-        const isMatched = item.assignments?.some((a) => a.volunteerId === volId);
-        if (!isMatched) return false;
+        if (!activeVol || activeVol.volunteerId !== volId) return false;
       }
 
       // Status filter
@@ -267,7 +315,7 @@ export default function RescueCases() {
       } else if (statusFilter === "RECOVERED") {
         if (!["RECOVERED", "LISTED_FOR_ADOPTION", "ADOPTED"].includes(item.status)) return false;
       } else if (statusFilter === "NEEDS_DISPATCH") {
-        if (item.status !== "REPORTED" || (item.assignments && item.assignments.length > 0)) return false;
+        if (item.status !== "REPORTED" || activeVol) return false;
       } else if (statusFilter !== "ALL") {
         if (item.status !== statusFilter) return false;
       }
@@ -286,7 +334,11 @@ export default function RescueCases() {
   const activeDispatches = cases.filter((c) => ["ASSIGNED", "RESCUED"].includes(c.status)).length;
   const inClinic = cases.filter((c) => c.status === "UNDER_TREATMENT").length;
   const recoveredCount = cases.filter((c) => ["RECOVERED", "LISTED_FOR_ADOPTION", "ADOPTED"].includes(c.status)).length;
-  const unassignedCount = cases.filter((c) => !c.assignments || c.assignments.length === 0).length;
+  const unassignedCount = cases.filter((c) => !getActiveAssignment(c)).length;
+
+  // Active assignment for the modal case
+  const modalActiveAssignment = dispatchModalCase ? getActiveAssignment(dispatchModalCase) : null;
+  const isReassignMode = Boolean(modalActiveAssignment);
 
   return (
     <section className="rescue-cases-page">
@@ -296,7 +348,7 @@ export default function RescueCases() {
           <div className="rescue-cases-eyebrow">PAWRESCUE FIELD DISPATCH</div>
           <h1>Rescue Cases & Field Operations</h1>
           <p>
-            Track which volunteer went for rescue, who dispatched them, inspect GPS distress locations, and monitor clinical recovery.
+            Track which volunteer went for rescue, reassign another volunteer when needed, inspect GPS distress locations, and monitor clinical recovery.
           </p>
         </div>
         <button
@@ -418,7 +470,7 @@ export default function RescueCases() {
                 <option value="ALL">All Volunteers (All Cases)</option>
                 <option value="UNASSIGNED">Only Unassigned Cases</option>
                 <option value="ASSIGNED">Only Assigned Cases</option>
-                <optgroup label="Filter by Specific Volunteer">
+                <optgroup label="Filter by Current Volunteer">
                   {volunteers.map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.name} (Volunteer)
@@ -505,8 +557,7 @@ export default function RescueCases() {
               <tbody>
                 {filteredCases.map((item) => {
                   const imageSrc = getImageUrl(item.images);
-                  const isAssigned = item.assignments && item.assignments.length > 0;
-                  const assignedVol = isAssigned ? item.assignments[item.assignments.length - 1] : null;
+                  const assignedVol = getActiveAssignment(item);
                   const rescueLog = item.statusHistories?.find((h) => h.newStatus === "RESCUED");
                   const treatmentLog = item.statusHistories?.find((h) => h.newStatus === "UNDER_TREATMENT");
 
@@ -697,22 +748,26 @@ export default function RescueCases() {
                               type="button"
                               onClick={() => {
                                 setDispatchModalCase(item);
-                                setDispatchVolunteerId(String(assignedVol.volunteerId || ""));
-                                setDispatchNotes(assignedVol.notes || "");
+                                setDispatchVolunteerId("");
+                                setDispatchNotes("");
                               }}
                               style={{
-                                marginTop: "4px",
+                                marginTop: "5px",
                                 background: "#f0fdf4",
                                 border: "1px solid #bbf7d0",
                                 color: "#166534",
-                                padding: "2px 7px",
-                                borderRadius: "4px",
-                                fontSize: "10px",
+                                padding: "3px 8px",
+                                borderRadius: "5px",
+                                fontSize: "11px",
                                 fontWeight: "700",
                                 cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
                               }}
                             >
-                              Reassign / Change
+                              <RefreshCw size={11} />
+                              <span>Reassign / Change</span>
                             </button>
                           </div>
                         ) : (
@@ -1008,14 +1063,14 @@ export default function RescueCases() {
           ========================================================================= */}
       {dispatchModalCase && (
         <div className="modal-backdrop" onClick={() => !dispatchSubmitting && setDispatchModalCase(null)}>
-          <div className="modal-card" style={{ maxWidth: "500px", background: "#ffffff" }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card" style={{ maxWidth: "520px", background: "#ffffff" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
               <div>
                 <span style={{ fontSize: "11px", fontWeight: "800", color: "#1b7a43", letterSpacing: "0.5px" }}>
-                  RESCUE OPERATIONS DISPATCH
+                  {isReassignMode ? "REASSIGN VOLUNTEER" : "DISPATCH RESCUE VOLUNTEER"}
                 </span>
                 <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#263b31", margin: "2px 0 0" }}>
-                  Dispatch Volunteer to #{String(dispatchModalCase.id).padStart(4, "0")} ({dispatchModalCase.animalName})
+                  {isReassignMode ? "Reassign Another Volunteer" : "Dispatch Volunteer"} &middot; #{String(dispatchModalCase.id).padStart(4, "0")} ({dispatchModalCase.animalName})
                 </h3>
               </div>
               <button
@@ -1027,10 +1082,50 @@ export default function RescueCases() {
               </button>
             </div>
 
+            {/* Currently assigned information box */}
+            {modalActiveAssignment && (
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "8px",
+                  padding: "12px 14px",
+                  marginBottom: "16px",
+                }}
+              >
+                <div style={{ fontSize: "11px", fontWeight: "700", color: "#166534" }}>CURRENTLY ASSIGNED VOLUNTEER</div>
+                <div style={{ fontSize: "14px", fontWeight: "800", color: "#166534", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Ambulance size={15} />
+                  <span>{modalActiveAssignment.volunteerName}</span>
+                </div>
+                <div style={{ fontSize: "12px", color: "#365343", marginTop: "3px" }}>
+                  Contact: <b>{modalActiveAssignment.volunteerPhone || "N/A"}</b> &middot; Dispatched: {formatDate(modalActiveAssignment.assignedAt)} ({timeAgo(modalActiveAssignment.assignedAt)})
+                </div>
+              </div>
+            )}
+
+            {/* If status is NOT FOUND notice */}
+            {dispatchModalCase.status === "NOT_FOUND" && (
+              <div
+                style={{
+                  background: "#fef3c7",
+                  border: "1px solid #fde68a",
+                  color: "#92400e",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  marginBottom: "16px",
+                  lineHeight: "1.5",
+                }}
+              >
+                <strong>Status Update Notice:</strong> This case was marked as <b>NOT FOUND</b> by the previous volunteer. Reassigning a new volunteer will automatically reset the case status to <b>ASSIGNED</b> so the new volunteer can locate and rescue the animal.
+              </div>
+            )}
+
             <form onSubmit={handleDispatchSubmit}>
               <div style={{ marginBottom: "14px" }}>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#263b31", marginBottom: "6px" }}>
-                  Select Approved Volunteer <span style={{ color: "#dc2626" }}>*</span>
+                  {isReassignMode ? "Select New Volunteer to Take Over Case *" : "Select Approved Volunteer *"}
                 </label>
                 <select
                   required
@@ -1044,26 +1139,34 @@ export default function RescueCases() {
                     fontSize: "13px",
                     color: "#263b31",
                     background: "#ffffff",
+                    fontWeight: "600",
                   }}
                 >
-                  <option value="">Choose an active volunteer...</option>
-                  {volunteers.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} &middot; {v.phone || v.email}
-                    </option>
-                  ))}
+                  <option value="">Choose another active volunteer...</option>
+                  {volunteers.map((v) => {
+                    const isCurrent = modalActiveAssignment && v.id === modalActiveAssignment.volunteerId;
+                    return (
+                      <option key={v.id} value={v.id} disabled={isCurrent}>
+                        {v.name} {isCurrent ? "— (Currently Assigned)" : `— Phone: ${v.phone || v.email}`}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
               <div style={{ marginBottom: "18px" }}>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#263b31", marginBottom: "6px" }}>
-                  Field Dispatch Notes / Instructions
+                  {isReassignMode ? "Reassignment Instructions / Reason" : "Field Dispatch Notes / Instructions"}
                 </label>
                 <textarea
                   rows={3}
                   value={dispatchNotes}
                   onChange={(e) => setDispatchNotes(e.target.value)}
-                  placeholder="e.g. Bring dog crate and muzzle. Reported animal is limping near the tea stall."
+                  placeholder={
+                    isReassignMode
+                      ? "e.g. Previous volunteer reported animal not found / unavailable. Reassigning to another volunteer with updated area directions."
+                      : "e.g. Bring dog crate and muzzle. Reported animal is near the tea stall."
+                  }
                   style={{
                     width: "100%",
                     padding: "9px 12px",
@@ -1076,43 +1179,72 @@ export default function RescueCases() {
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => setDispatchModalCase(null)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid #d4dfd7",
-                    background: "#ffffff",
-                    color: "#475e51",
-                    fontWeight: "600",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={dispatchSubmitting || !dispatchVolunteerId}
-                  style={{
-                    padding: "8px 18px",
-                    borderRadius: "8px",
-                    background: "#1b7a43",
-                    color: "#ffffff",
-                    border: "none",
-                    fontWeight: "700",
-                    fontSize: "13px",
-                    cursor: dispatchSubmitting || !dispatchVolunteerId ? "not-allowed" : "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <Ambulance size={14} />
-                  <span>{dispatchSubmitting ? "Dispatching..." : "Confirm Dispatch"}</span>
-                </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                {isReassignMode ? (
+                  <button
+                    type="button"
+                    onClick={() => handleUnassign(dispatchModalCase.id)}
+                    disabled={dispatchSubmitting}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #fecaca",
+                      background: "#fef2f2",
+                      color: "#b91c1c",
+                      fontWeight: "700",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                    title="Remove volunteer and reset case to unassigned open distress pool"
+                  >
+                    <UserX size={14} />
+                    <span>Unassign Current Volunteer</span>
+                  </button>
+                ) : (
+                  <div></div>
+                )}
+
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setDispatchModalCase(null)}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      border: "1px solid #d4dfd7",
+                      background: "#ffffff",
+                      color: "#475e51",
+                      fontWeight: "600",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={dispatchSubmitting || !dispatchVolunteerId}
+                    style={{
+                      padding: "8px 18px",
+                      borderRadius: "8px",
+                      background: "#1b7a43",
+                      color: "#ffffff",
+                      border: "none",
+                      fontWeight: "700",
+                      fontSize: "13px",
+                      cursor: dispatchSubmitting || !dispatchVolunteerId ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <Ambulance size={14} />
+                    <span>{dispatchSubmitting ? "Updating..." : isReassignMode ? "Confirm Reassignment" : "Confirm Dispatch"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1277,40 +1409,68 @@ export default function RescueCases() {
                 marginBottom: "20px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-                <Shield size={16} color="#1b7a43" />
-                <span style={{ fontSize: "13px", fontWeight: "700", color: "#1b7a43" }}>
-                  Assignment & Dispatch Particulars
-                </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Shield size={16} color="#1b7a43" />
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: "#1b7a43" }}>
+                    Assignment & Dispatch Particulars
+                  </span>
+                </div>
+                {getActiveAssignment(viewingTimelineCase) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDispatchModalCase(viewingTimelineCase);
+                      setDispatchVolunteerId("");
+                      setDispatchNotes("");
+                    }}
+                    style={{
+                      background: "#e8f5ec",
+                      border: "1px solid #c9e4d1",
+                      color: "#166534",
+                      padding: "3px 8px",
+                      borderRadius: "5px",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <RefreshCw size={11} />
+                    <span>Reassign Volunteer</span>
+                  </button>
+                )}
               </div>
 
-              {viewingTimelineCase.assignments && viewingTimelineCase.assignments.length > 0 ? (
-                (() => {
-                  const assignment = viewingTimelineCase.assignments[viewingTimelineCase.assignments.length - 1];
+              {(() => {
+                const activeAssigned = getActiveAssignment(viewingTimelineCase);
+                if (activeAssigned) {
                   return (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px" }}>
                       <div>
-                        <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>ASSIGNED VOLUNTEER</div>
+                        <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>ACTIVE VOLUNTEER</div>
                         <div style={{ fontWeight: "700", color: "#263b31", marginTop: "2px" }}>
-                          {assignment.volunteerName}
+                          {activeAssigned.volunteerName}
                         </div>
-                        {assignment.volunteerPhone && (
+                        {activeAssigned.volunteerPhone && (
                           <div style={{ fontSize: "12px", color: "#1b7a43", display: "flex", alignItems: "center", gap: "3px" }}>
                             <Phone size={11} />
-                            <a href={`tel:${assignment.volunteerPhone}`} style={{ color: "#1b7a43", textDecoration: "none", fontWeight: "600" }}>
-                              {assignment.volunteerPhone}
+                            <a href={`tel:${activeAssigned.volunteerPhone}`} style={{ color: "#1b7a43", textDecoration: "none", fontWeight: "600" }}>
+                              {activeAssigned.volunteerPhone}
                             </a>
                           </div>
                         )}
-                        {assignment.volunteerEmail && (
-                          <div style={{ fontSize: "11px", color: "#61776b" }}>{assignment.volunteerEmail}</div>
+                        {activeAssigned.volunteerEmail && (
+                          <div style={{ fontSize: "11px", color: "#61776b" }}>{activeAssigned.volunteerEmail}</div>
                         )}
                       </div>
 
                       <div>
                         <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>ASSIGNED BY</div>
                         <div style={{ fontWeight: "700", color: "#263b31", marginTop: "2px" }}>
-                          {assignment.assignedByName || "System Administrator"}
+                          {activeAssigned.assignedByName || "System Administrator"}
                         </div>
                         <div style={{ fontSize: "11px", color: "#61776b" }}>Rescue Center Authority</div>
                       </div>
@@ -1318,52 +1478,54 @@ export default function RescueCases() {
                       <div>
                         <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>DISPATCH TIMESTAMP</div>
                         <div style={{ fontWeight: "700", color: "#166534", marginTop: "2px" }}>
-                          {formatDate(assignment.assignedAt)}
+                          {formatDate(activeAssigned.assignedAt)}
                         </div>
                         <div style={{ fontSize: "11px", color: "#059669" }}>
-                          When volunteer went for rescue ({timeAgo(assignment.assignedAt)})
+                          When volunteer went for rescue ({timeAgo(activeAssigned.assignedAt)})
                         </div>
                       </div>
 
                       <div>
                         <div style={{ color: "#61776b", fontSize: "11px", fontWeight: "700" }}>DISPATCH INSTRUCTIONS</div>
                         <div style={{ color: "#374151", marginTop: "2px" }}>
-                          {assignment.notes || "Standard emergency rescue dispatch"}
+                          {activeAssigned.notes || "Standard emergency rescue dispatch"}
                         </div>
                       </div>
                     </div>
                   );
-                })()
-              ) : (
-                <div>
-                  <div style={{ color: "#b45309", fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>
-                    Case is currently unassigned (No volunteer dispatched yet).
+                }
+
+                return (
+                  <div>
+                    <div style={{ color: "#b45309", fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>
+                      Case is currently unassigned (No volunteer dispatched yet).
+                    </div>
+                    <button
+                      onClick={() => {
+                        setDispatchModalCase(viewingTimelineCase);
+                        setDispatchVolunteerId("");
+                        setDispatchNotes("");
+                      }}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: "6px",
+                        background: "#1b7a43",
+                        color: "#fff",
+                        border: "none",
+                        fontWeight: "700",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <UserPlus size={13} />
+                      <span>Dispatch Volunteer Now</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setDispatchModalCase(viewingTimelineCase);
-                      setDispatchVolunteerId("");
-                      setDispatchNotes("");
-                    }}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: "6px",
-                      background: "#1b7a43",
-                      color: "#fff",
-                      border: "none",
-                      fontWeight: "700",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <UserPlus size={13} />
-                    <span>Dispatch Volunteer Now</span>
-                  </button>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Visual Milestones Stepper */}

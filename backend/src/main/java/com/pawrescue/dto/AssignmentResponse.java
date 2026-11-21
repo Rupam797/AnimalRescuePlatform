@@ -14,6 +14,7 @@ public class AssignmentResponse {
     private String assignedByName;
     private LocalDateTime assignedAt;
     private String notes;
+    private boolean active = true;
 
     public AssignmentResponse() {
     }
@@ -22,6 +23,7 @@ public class AssignmentResponse {
         if (assignment == null) return null;
         AssignmentResponse dto = new AssignmentResponse();
         dto.setId(assignment.getId());
+        dto.setActive(assignment.isActive());
         if (assignment.getVolunteer() != null) {
             dto.setVolunteerId(assignment.getVolunteer().getId());
             dto.setVolunteerName(assignment.getVolunteer().getName());
@@ -98,5 +100,13 @@ public class AssignmentResponse {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

@@ -37,7 +37,7 @@ public interface RescueReportRepository extends JpaRepository<RescueReport, Long
             Pageable pageable
     );
 
-    @Query("SELECT r FROM RescueReport r JOIN r.assignments a WHERE a.volunteer = :volunteer ORDER BY r.createdAt DESC")
+    @Query("SELECT r FROM RescueReport r JOIN r.assignments a WHERE a.volunteer = :volunteer AND a.active = true ORDER BY r.createdAt DESC")
     List<RescueReport> findAssignedToVolunteer(@Param("volunteer") User volunteer);
 
     @Query("SELECT r FROM RescueReport r WHERE r.status = 'RECOVERED' AND NOT EXISTS (SELECT a FROM AdoptionAnimal a WHERE a.report = r)")
