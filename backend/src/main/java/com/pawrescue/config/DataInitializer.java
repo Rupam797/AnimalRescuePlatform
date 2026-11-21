@@ -224,6 +224,28 @@ public class DataInitializer implements CommandLineRunner {
             logger.info("Demo adoptable animals and requests seeded successfully.");
         }
 
+        // 4b. Ensure at least one demo adopted record exists for reporting
+        if (adoptionAnimalRepository.countByStatus(AdoptionStatus.ADOPTED) == 0) {
+            User adopterUser = userRepository.findByEmail("ananya.citizen@gmail.com").orElse(admin);
+            AdoptionAnimal a4 = new AdoptionAnimal();
+            a4.setName("Luna");
+            a4.setSpecies("Dog");
+            a4.setBreed("Labrador Mix");
+            a4.setAge("2 years");
+            a4.setGender("Female");
+            a4.setHealthNotes("Healthy, spayed, fully vaccinated.");
+            a4.setDescription("Luna was rescued after a road injury and made a full recovery. Adopted by Ananya!");
+            a4.setPhotoUrl("https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=800&q=80");
+            a4.setStatus(AdoptionStatus.ADOPTED);
+            a4.setPublishedAt(LocalDateTime.now().minusMonths(1).minusDays(10));
+            a4.setAdoptedAt(LocalDateTime.now().minusDays(5));
+            adoptionAnimalRepository.save(a4);
+
+            AdoptionRequest req4 = new AdoptionRequest(a4, adopterUser, "We adopted Luna and she is flourishing in our home!", "+91-9777712345");
+            req4.setStatus(AdoptionRequestStatus.APPROVED);
+            adoptionRequestRepository.save(req4);
+        }
+
         // 5. Seed sample notifications
         if (notificationRepository.count() == 0) {
             notificationRepository.save(new AppNotification("Welcome to Animal Rescue Platform", "System initialized and ready.", "SYSTEM", null));

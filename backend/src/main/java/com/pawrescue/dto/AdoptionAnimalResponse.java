@@ -19,6 +19,7 @@ public class AdoptionAnimalResponse {
     private String photoUrl;
     private AdoptionStatus status;
     private LocalDateTime publishedAt;
+    private LocalDateTime adoptedAt;
 
     public AdoptionAnimalResponse() {
     }
@@ -40,6 +41,7 @@ public class AdoptionAnimalResponse {
         dto.setPhotoUrl(animal.getPhotoUrl());
         dto.setStatus(animal.getStatus());
         dto.setPublishedAt(animal.getPublishedAt());
+        dto.setAdoptedAt(animal.getAdoptedAt());
         return dto;
     }
 
@@ -137,5 +139,13 @@ public class AdoptionAnimalResponse {
 
     public void setPublishedAt(LocalDateTime publishedAt) {
         this.publishedAt = publishedAt;
+    }
+
+    public LocalDateTime getAdoptedAt() {
+        return adoptedAt;
+    }
+
+    public void setAdoptedAt(LocalDateTime adoptedAt) {
+        this.adoptedAt = adoptedAt;
     }
 }

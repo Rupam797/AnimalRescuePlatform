@@ -61,6 +61,18 @@ public class AdoptionController {
         return ResponseEntity.ok(adoptionService.getAdoptableAnimalById(id));
     }
 
+    // Admin filter adoption list and stats by month / date range
+    @GetMapping("/adopted-report")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdoptionReportResponse> getAdoptedReport(
+            @RequestParam(value = "fromMonth", required = false) String fromMonth,
+            @RequestParam(value = "toMonth", required = false) String toMonth,
+            @RequestParam(value = "startDate", required = false) String startDate,
+            @RequestParam(value = "endDate", required = false) String endDate,
+            @RequestParam(value = "species", required = false) String species) {
+        return ResponseEntity.ok(adoptionService.getAdoptedReport(fromMonth, toMonth, startDate, endDate, species));
+    }
+
     // Admin publish animal
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")

@@ -107,6 +107,7 @@ export const adoptionService = {
   getMyRequests: () => api.get("/adoptions/my-requests"),
   getAllRequests: (params) => api.get("/adoptions/requests", { params }),
   updateRequestStatus: (id, data) => api.put(`/adoptions/requests/${id}/status`, data),
+  getAdoptedReport: (params) => api.get("/adoptions/adopted-report", { params }),
 };
 
 // Admin endpoints

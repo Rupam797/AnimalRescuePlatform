@@ -205,6 +205,7 @@ public class AdoptionService {
         if (newStatus == AdoptionRequestStatus.APPROVED) {
             // Mark animal ADOPTED
             animal.setStatus(AdoptionStatus.ADOPTED);
+            animal.setAdoptedAt(java.time.LocalDateTime.now());
             adoptionAnimalRepository.save(animal);
 
             // If animal was linked to a rescue report, update report status to ADOPTED
@@ -247,5 +248,93 @@ public class AdoptionService {
         }
 
         return AdoptionRequestResponse.fromEntity(updatedRequest);
+    }
+
+    @Transactional(readOnly = true)
+    public AdoptionReportResponse getAdoptedReport(String fromMonth, String toMonth, String startDate, String endDate, String species) {
+        java.time.LocalDateTime start;
+        java.time.LocalDateTime end;
+
+        try {
+            if (fromMonth != null && !fromMonth.isBlank()) {
+                String[] parts = fromMonth.split("-");
+                int year = Integer.parseInt(parts[0]);
+                int month = Integer.parseInt(parts[1]);
+                start = java.time.LocalDateTime.of(year, month, 1, 0, 0, 0);
+            } else if (startDate != null && !startDate.isBlank()) {
+                start = java.time.LocalDate.parse(startDate).atStartOfDay();
+            } else {
+                start = java.time.LocalDateTime.of(java.time.LocalDate.now().getYear(), 1, 1, 0, 0, 0);
+            }
+
+            if (toMonth != null && !toMonth.isBlank()) {
+                String[] parts = toMonth.split("-");
+                int year = Integer.parseInt(parts[0]);
+                int month = Integer.parseInt(parts[1]);
+                java.time.YearMonth ym = java.time.YearMonth.of(year, month);
+                end = ym.atEndOfMonth().atTime(23, 59, 59);
+            } else if (endDate != null && !endDate.isBlank()) {
+                end = java.time.LocalDate.parse(endDate).atTime(23, 59, 59);
+            } else {
+                end = java.time.LocalDateTime.now();
+            }
+        } catch (Exception e) {
+            start = java.time.LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+            end = java.time.LocalDateTime.now();
+        }
+
+        List<AdoptionAnimal> adoptedList = adoptionAnimalRepository.findAdoptedInPeriod(
+                AdoptionStatus.ADOPTED,
+                start,
+                end,
+                (species != null && !species.isBlank() && !species.equalsIgnoreCase("all")) ? species.trim() : null
+        );
+
+        java.util.Map<String, Long> speciesCounts = adoptedList.stream()
+                .collect(Collectors.groupingBy(AdoptionAnimal::getSpecies, Collectors.counting()));
+
+        List<AdoptionReportResponse.AdoptedAnimalItemDto> animalItems = adoptedList.stream().map(a -> {
+            AdoptionReportResponse.AdoptedAnimalItemDto dto = new AdoptionReportResponse.AdoptedAnimalItemDto();
+            dto.setId(a.getId());
+            if (a.getReport() != null) {
+                dto.setReportId(a.getReport().getId());
+            }
+            dto.setName(a.getName());
+            dto.setSpecies(a.getSpecies());
+            dto.setBreed(a.getBreed());
+            dto.setAge(a.getAge());
+            dto.setGender(a.getGender());
+            dto.setPhotoUrl(a.getPhotoUrl());
+            dto.setPublishedAt(a.getPublishedAt());
+            dto.setAdoptedAt(a.getAdoptedAt() != null ? a.getAdoptedAt() : a.getPublishedAt());
+
+            if (dto.getPublishedAt() != null && dto.getAdoptedAt() != null) {
+                long days = java.time.Duration.between(dto.getPublishedAt(), dto.getAdoptedAt()).toDays();
+                dto.setDaysToAdoption(Math.max(0, days));
+            }
+
+            if (a.getRequests() != null) {
+                a.getRequests().stream()
+                        .filter(r -> r.getStatus() == AdoptionRequestStatus.APPROVED)
+                        .findFirst()
+                        .ifPresent(approvedReq -> {
+                            if (approvedReq.getUser() != null) {
+                                dto.setAdopterName(approvedReq.getUser().getName());
+                                dto.setAdopterEmail(approvedReq.getUser().getEmail());
+                            }
+                            dto.setAdopterPhone(approvedReq.getPhone());
+                        });
+            }
+
+            return dto;
+        }).collect(Collectors.toList());
+
+        return new AdoptionReportResponse(
+                animalItems.size(),
+                start.toLocalDate().toString(),
+                end.toLocalDate().toString(),
+                speciesCounts,
+                animalItems
+        );
     }
 }

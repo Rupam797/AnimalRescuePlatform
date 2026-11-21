@@ -30,4 +30,15 @@ public interface AdoptionAnimalRepository extends JpaRepository<AdoptionAnimal, 
             @Param("search") String search,
             Pageable pageable
     );
+
+    @Query("SELECT a FROM AdoptionAnimal a WHERE a.status = :status AND " +
+           "(COALESCE(a.adoptedAt, a.publishedAt) BETWEEN :start AND :end) AND " +
+           "(:species IS NULL OR LOWER(a.species) = LOWER(:species)) " +
+           "ORDER BY COALESCE(a.adoptedAt, a.publishedAt) DESC")
+    List<AdoptionAnimal> findAdoptedInPeriod(
+            @Param("status") AdoptionStatus status,
+            @Param("start") java.time.LocalDateTime start,
+            @Param("end") java.time.LocalDateTime end,
+            @Param("species") String species
+    );
 }

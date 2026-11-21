@@ -52,6 +52,9 @@ public class AdoptionAnimal {
     @Column(name = "published_at", nullable = false)
     private LocalDateTime publishedAt;
 
+    @Column(name = "adopted_at")
+    private LocalDateTime adoptedAt;
+
     public AdoptionAnimal() {
     }
 
@@ -167,5 +170,13 @@ public class AdoptionAnimal {
 
     public void setPublishedAt(LocalDateTime publishedAt) {
         this.publishedAt = publishedAt;
+    }
+
+    public LocalDateTime getAdoptedAt() {
+        return adoptedAt;
+    }
+
+    public void setAdoptedAt(LocalDateTime adoptedAt) {
+        this.adoptedAt = adoptedAt;
     }
 }

@@ -378,11 +378,13 @@ export default function AdminDashboard() {
                     <div className="stat-icon stat-green">
                       <FileText size={18} />
                     </div>
-                    <span className="stat-trend positive">Emergency rescue alerts</span>
                   </div>
                   <div className="stat-label">Total Reports</div>
                   <div className="stat-value-row">
                     <h2>{totalCount}</h2>
+                  </div>
+                  <div style={{ marginTop: "8px" }}>
+                    <span className="stat-trend positive">Emergency rescue alerts</span>
                   </div>
                 </div>
 
@@ -391,11 +393,13 @@ export default function AdminDashboard() {
                     <div className="stat-icon stat-orange">
                       <Clock size={18} />
                     </div>
-                    <span className="stat-trend warning">In transit / in clinic</span>
                   </div>
                   <div className="stat-label">Active Field Cases</div>
                   <div className="stat-value-row">
                     <h2>{activeCases}</h2>
+                  </div>
+                  <div style={{ marginTop: "8px" }}>
+                    <span className="stat-trend warning">In transit / in clinic</span>
                   </div>
                 </div>
 
@@ -404,11 +408,13 @@ export default function AdminDashboard() {
                     <div className="stat-icon stat-purple">
                       <CheckCircle2 size={18} />
                     </div>
-                    <span className="stat-trend purple-trend">Safely secured & treated</span>
                   </div>
                   <div className="stat-label">Animals Rescued</div>
                   <div className="stat-value-row">
                     <h2>{rescuedCount}</h2>
+                  </div>
+                  <div style={{ marginTop: "8px" }}>
+                    <span className="stat-trend purple-trend">Safely secured & treated</span>
                   </div>
                 </div>
 
@@ -417,11 +423,13 @@ export default function AdminDashboard() {
                     <div className="stat-icon stat-blue">
                       <Heart size={18} />
                     </div>
-                    <span className="stat-trend">{adoptedCount} already placed</span>
                   </div>
                   <div className="stat-label">Ready for Adoption</div>
                   <div className="stat-value-row">
                     <h2>{readyForAdoption}</h2>
+                  </div>
+                  <div style={{ marginTop: "8px" }}>
+                    <span className="stat-trend">{adoptedCount} already placed</span>
                   </div>
                 </div>
               </div>
